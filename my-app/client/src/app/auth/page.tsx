@@ -109,13 +109,32 @@ export default function AuthPage() {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      // Check content type and parse accordingly
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      try {
+        if (contentType?.includes('application/json')) {
+          data = await response.json();
+        } else {
+          const text = await response.text();
+          console.error('Server response is not JSON:', text);
+          setErrors(['Server returned an invalid response. Please check if the server is running properly.']);
+          return;
+        }
+      } catch (parseError) {
+        console.error('JSON parsing error:', parseError);
+        setErrors(['Failed to parse server response. Please try again.']);
+        return;
+      }
 
       if (!response.ok) {
         if (data.errors) {
           setErrors(data.errors);
+        } else if (data.error) {
+          setErrors([data.error]);
         } else {
-          setErrors([data.error || 'An error occurred']);
+          setErrors(['An error occurred']);
         }
         return;
       }

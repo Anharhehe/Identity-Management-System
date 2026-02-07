@@ -188,6 +188,10 @@ export default function ProfessionalProfilePage() {
     }
   };
 
+  const handleMessage = () => {
+    router.push(`/messages/professional`);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen dark:bg-gray-900 bg-white flex items-center justify-center">
@@ -278,7 +282,7 @@ export default function ProfessionalProfilePage() {
                 buttonState === 'message' ? (
                   <div className="space-y-3">
                     <button
-                      onClick={() => {}}
+                      onClick={handleMessage}
                       className="w-full py-3 rounded-lg font-semibold cursor-pointer transition-colors bg-green-600 text-white hover:bg-green-700"
                     >
                       <BiMessageDots className="inline mr-2" />
@@ -304,7 +308,7 @@ export default function ProfessionalProfilePage() {
               ) : isFriend ? (
                 <div className="space-y-3">
                   <button
-                    onClick={() => {}}
+                    onClick={handleMessage}
                     className="w-full py-3 rounded-lg font-semibold cursor-pointer transition-colors bg-green-600 text-white hover:bg-green-700"
                   >
                     <BiMessageDots className="inline mr-2" />

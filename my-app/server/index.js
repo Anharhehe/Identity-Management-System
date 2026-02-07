@@ -6,6 +6,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const validator = require('validator');
+const CryptoJS = require('crypto-js');
 require('dotenv').config();
 
 const app = express();
@@ -29,10 +30,34 @@ app.use(limiter);
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // limit each IP to 5 auth requests per windowMs
-  message: 'Too many authentication attempts, please try again later.'
+  handler: (req, res) => {
+    res.status(429).json({ 
+      error: 'Too many authentication attempts, please try again later.',
+      retryAfter: req.rateLimit.resetTime 
+    });
+  },
+  skip: (req, res) => false,
+  keyGenerator: (req, res) => req.ip
 });
 
 app.use(express.json({ limit: '10mb' }));
+
+// Encryption utilities
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-secret-key-change-in-production';
+
+const encryptMessage = (message) => {
+  return CryptoJS.AES.encrypt(message, ENCRYPTION_KEY).toString();
+};
+
+const decryptMessage = (encryptedMessage) => {
+  try {
+    const bytes = CryptoJS.AES.decrypt(encryptedMessage, ENCRYPTION_KEY);
+    return bytes.toString(CryptoJS.enc.Utf8);
+  } catch (error) {
+    console.error('Decryption error:', error);
+    return null;
+  }
+};
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -239,6 +264,55 @@ const friendRequestSchema = new mongoose.Schema({
 friendRequestSchema.index({ senderIdentityId: 1, recipientIdentityId: 1, context: 1 }, { unique: true });
 
 const FriendRequest = mongoose.model('FriendRequest', friendRequestSchema);
+
+// Message Schema - for encrypted messaging
+const messageSchema = new mongoose.Schema({
+  senderUserId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  senderIdentityId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Identity',
+    required: true
+  },
+  recipientUserId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  recipientIdentityId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Identity',
+    required: true
+  },
+  message: {
+    type: String,
+    required: true
+    // This will store the encrypted message
+  },
+  context: {
+    type: String,
+    enum: ['professional', 'personal', 'family', 'online'],
+    required: true
+  },
+  isRead: {
+    type: Boolean,
+    default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+    index: true
+  }
+});
+
+// Create index for message queries
+messageSchema.index({ senderUserId: 1, recipientUserId: 1, context: 1, createdAt: -1 });
+messageSchema.index({ recipientUserId: 1, context: 1, isRead: 1 });
+
+const Message = mongoose.model('Message', messageSchema);
 
 // Middleware to verify JWT token
 const authenticateToken = async (req, res, next) => {
@@ -744,21 +818,34 @@ app.get('/api/friends/:context', authenticateToken, async (req, res) => {
     if (!['professional', 'personal', 'family', 'online'].includes(context)) {
       return res.status(400).json({ error: 'Invalid context type' });
     }
+
+    // Get all identities of the current user
+    const userIdentities = await Identity.find({ userId: req.userId });
+    const userIdentityIds = userIdentities.map(id => id._id.toString());
     
     const friends = await Friend.find({
       userId: req.userId,
       context
     }).populate('friendIdentityId').sort({ createdAt: -1 });
     
-    const friendIdentities = friends.map(friend => ({
-      id: friend.friendIdentityId._id,
-      legalName: friend.friendIdentityId.legalName,
-      preferredName: friend.friendIdentityId.preferredName,
-      nickname: friend.friendIdentityId.nickname,
-      context: friend.friendIdentityId.context,
-      accountPrivacy: friend.friendIdentityId.accountPrivacy,
-      createdAt: friend.createdAt
-    }));
+    const friendIdentities = friends
+      .filter(friend => {
+        // Skip if friendIdentityId is null (means the Identity was deleted)
+        if (!friend.friendIdentityId) {
+          return false;
+        }
+        const isSelf = userIdentityIds.includes(friend.friendIdentityId._id.toString());
+        return !isSelf;
+      })
+      .map(friend => ({
+        id: friend.friendIdentityId._id,
+        legalName: friend.friendIdentityId.legalName,
+        preferredName: friend.friendIdentityId.preferredName,
+        nickname: friend.friendIdentityId.nickname,
+        context: friend.friendIdentityId.context,
+        accountPrivacy: friend.friendIdentityId.accountPrivacy,
+        createdAt: friend.createdAt
+      }));
     
     res.json({
       count: friendIdentities.length,
@@ -896,6 +983,11 @@ app.post('/api/friend-requests/send', authenticateToken, async (req, res) => {
     const recipientIdentity = await Identity.findById(recipientIdentityId);
     if (!recipientIdentity) {
       return res.status(404).json({ error: 'Recipient identity not found' });
+    }
+    
+    // Prevent sending friend request to yourself
+    if (senderIdentity._id.toString() === recipientIdentity._id.toString()) {
+      return res.status(400).json({ error: 'You cannot send a friend request to yourself' });
     }
     
     // Create friend request
@@ -1171,6 +1263,217 @@ app.delete('/api/identities/:id', authenticateToken, async (req, res) => {
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// ============ MESSAGING ENDPOINTS ============
+
+// Send message
+app.post('/api/messages/send', authenticateToken, async (req, res) => {
+  try {
+    const { recipientIdentityId, message, context } = req.body;
+
+    if (!recipientIdentityId || !message || !context) {
+      return res.status(400).json({ error: 'Recipient identity ID, message, and context are required' });
+    }
+
+    if (!['professional', 'personal', 'family', 'online'].includes(context)) {
+      return res.status(400).json({ error: 'Invalid context type' });
+    }
+
+    // Get sender's identity for this context
+    const senderIdentity = await Identity.findOne({ userId: req.userId, context });
+    if (!senderIdentity) {
+      return res.status(400).json({ error: 'You do not have an identity in this context' });
+    }
+
+    // Get recipient identity
+    const recipientIdentity = await Identity.findById(recipientIdentityId);
+    if (!recipientIdentity) {
+      return res.status(404).json({ error: 'Recipient identity not found' });
+    }
+
+    // Check if they are friends
+    const friendship = await Friend.findOne({
+      userId: req.userId,
+      friendIdentityId: recipientIdentityId,
+      context
+    });
+
+    if (!friendship) {
+      return res.status(403).json({ error: 'You are not friends with this user' });
+    }
+
+    // Encrypt the message
+    const encryptedMessage = encryptMessage(message);
+
+    // Create and save message
+    const newMessage = new Message({
+      senderUserId: req.userId,
+      senderIdentityId: senderIdentity._id,
+      recipientUserId: recipientIdentity.userId,
+      recipientIdentityId: recipientIdentity._id,
+      message: encryptedMessage,
+      context,
+      isRead: false
+    });
+
+    await newMessage.save();
+
+    res.json({
+      message: 'Message sent successfully',
+      messageId: newMessage._id,
+      createdAt: newMessage.createdAt
+    });
+  } catch (error) {
+    console.error('Send message error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get messages with a specific friend
+app.get('/api/messages/:context/:friendIdentityId', authenticateToken, async (req, res) => {
+  try {
+    const { context, friendIdentityId } = req.params;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = parseInt(req.query.skip) || 0;
+
+    if (!['professional', 'personal', 'family', 'online'].includes(context)) {
+      return res.status(400).json({ error: 'Invalid context type' });
+    }
+
+    // Get messages between current user and friend
+    const messages = await Message.find({
+      $or: [
+        {
+          senderUserId: req.userId,
+          recipientIdentityId: friendIdentityId,
+          context
+        },
+        {
+          recipientUserId: req.userId,
+          senderIdentityId: friendIdentityId,
+          context
+        }
+      ]
+    })
+      .sort({ createdAt: 1 })
+      .skip(skip)
+      .limit(limit)
+      .select('-__v');
+
+    // Decrypt messages
+    const decryptedMessages = messages.map(msg => ({
+      id: msg._id,
+      senderUserId: msg.senderUserId,
+      senderIdentityId: msg.senderIdentityId,
+      recipientUserId: msg.recipientUserId,
+      recipientIdentityId: msg.recipientIdentityId,
+      message: decryptMessage(msg.message),
+      context: msg.context,
+      isRead: msg.isRead,
+      createdAt: msg.createdAt
+    }));
+
+    // Mark messages as read
+    await Message.updateMany(
+      {
+        recipientUserId: req.userId,
+        senderIdentityId: friendIdentityId,
+        context,
+        isRead: false
+      },
+      { isRead: true }
+    );
+
+    res.json({
+      count: decryptedMessages.length,
+      messages: decryptedMessages
+    });
+  } catch (error) {
+    console.error('Get messages error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all conversations for a context
+app.get('/api/messages/conversations/:context', authenticateToken, async (req, res) => {
+  try {
+    const { context } = req.params;
+
+    if (!['professional', 'personal', 'family', 'online'].includes(context)) {
+      return res.status(400).json({ error: 'Invalid context type' });
+    }
+
+    // Get current user's identity in this context
+    const userIdentity = await Identity.findOne({ userId: req.userId, context });
+    if (!userIdentity) {
+      return res.json({ conversations: [] });
+    }
+
+    // Get all friends in this context
+    const friends = await Friend.find({
+      userId: req.userId,
+      context
+    }).populate('friendIdentityId');
+
+    // Filter out user's own identities
+    const userIdentityIds = (await Identity.find({ userId: req.userId })).map(id => id._id.toString());
+    const validFriends = friends.filter(f => !userIdentityIds.includes(f.friendIdentityId._id.toString()));
+
+    // Get conversations with last message
+    const conversations = await Promise.all(
+      validFriends.map(async friend => {
+        const lastMessage = await Message.findOne({
+          $or: [
+            {
+              senderUserId: req.userId,
+              recipientIdentityId: friend.friendIdentityId._id,
+              context
+            },
+            {
+              recipientUserId: req.userId,
+              senderIdentityId: friend.friendIdentityId._id,
+              context
+            }
+          ]
+        })
+          .sort({ createdAt: -1 })
+          .select('message createdAt isRead');
+
+        const unreadCount = await Message.countDocuments({
+          recipientUserId: req.userId,
+          senderIdentityId: friend.friendIdentityId._id,
+          context,
+          isRead: false
+        });
+
+        return {
+          friendId: friend.friendIdentityId._id,
+          friendName: friend.friendIdentityId.preferredName,
+          friendLegalName: friend.friendIdentityId.legalName,
+          lastMessage: lastMessage ? decryptMessage(lastMessage.message) : null,
+          lastMessageTime: lastMessage?.createdAt || null,
+          unreadCount,
+          context
+        };
+      })
+    );
+
+    // Sort by last message time
+    conversations.sort((a, b) => {
+      const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+      const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+      return timeB - timeA;
+    });
+
+    res.json({
+      count: conversations.length,
+      conversations
+    });
+  } catch (error) {
+    console.error('Get conversations error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Error handling middleware

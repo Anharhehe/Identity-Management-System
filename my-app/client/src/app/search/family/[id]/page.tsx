@@ -188,6 +188,10 @@ export default function FamilyProfilePage() {
     }
   };
 
+  const handleMessage = () => {
+    router.push(`/messages/family`);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen dark:bg-gray-900 bg-white flex items-center justify-center">
@@ -279,7 +283,7 @@ export default function FamilyProfilePage() {
                 buttonState === 'message' ? (
                   <div className="space-y-3">
                     <button
-                      onClick={() => {}}
+                      onClick={handleMessage}
                       className="w-full py-3 rounded-lg font-semibold cursor-pointer transition-colors bg-green-600 text-white hover:bg-green-700"
                     >
                       <BiMessageDots className="inline mr-2" />
@@ -305,7 +309,7 @@ export default function FamilyProfilePage() {
               ) : isFriend ? (
                 <div className="space-y-3">
                   <button
-                    onClick={() => {}}
+                    onClick={handleMessage}
                     className="w-full py-3 rounded-lg font-semibold cursor-pointer transition-colors bg-green-600 text-white hover:bg-green-700"
                   >
                     <BiMessageDots className="inline mr-2" />
