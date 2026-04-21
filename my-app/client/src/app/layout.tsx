@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import HeaderWrapper from "@/components/header-wrapper/page";
+import Footer from "@/components/footer/page";
+import ChatBot from "@/components/chatbox/page";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { LoadingProvider } from "@/context/LoadingContext";
 import GlobalLoader from "@/components/global-loader/page";
@@ -39,7 +41,9 @@ export default function RootLayout({
               <main className="flex-1">
                 {children}
               </main>
+              <Footer />
             </div>
+            <ChatBot />
           </ThemeProvider>
         </LoadingProvider>
       </body>

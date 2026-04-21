@@ -145,7 +145,9 @@ export default function AuthPage() {
       setSuccessMessage(data.message);
 
       setTimeout(() => {
-        router.push('/dashboard');
+        // Redirect to admin dashboard if user is admin, otherwise go to normal dashboard
+        const redirectPath = data.user.isAdmin ? '/admin-dashboard' : '/dashboard';
+        router.push(redirectPath);
       }, 1500);
 
     } catch (error) {

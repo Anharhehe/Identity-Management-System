@@ -9,6 +9,8 @@ import { BiMessageDots } from 'react-icons/bi';
 import { CgProfile } from 'react-icons/cg';
 import { BiLogOut } from 'react-icons/bi';
 import { MdDarkMode, MdLightMode } from 'react-icons/md';
+import { GiHamburgerMenu } from 'react-icons/gi';
+import { AiOutlineClose } from 'react-icons/ai';
 import { useTheme } from '@/context/ThemeContext';
 import { useLoading } from '@/context/LoadingContext';
 import { Portal } from '@/lib/usePortal';
@@ -20,6 +22,7 @@ function HeaderContent() {
   const [showSearchMenu, setShowSearchMenu] = useState(false);
   const [showFavoritesMenu, setShowFavoritesMenu] = useState(false);
   const [showMessagesMenu, setShowMessagesMenu] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [userIdentities, setUserIdentities] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
@@ -140,8 +143,8 @@ function HeaderContent() {
           <h1 className="text-xl font-bold text-white"></h1>
         </button>
 
-        {/* Right Side - Icons */}
-        <div className="flex items-center gap-6">
+        {/* Desktop - Right Side Icons */}
+        <div className="hidden md:flex items-center gap-6">
           {/* Search Button with Dropdown */}
           <div className="relative">
             <button
@@ -419,13 +422,7 @@ function HeaderContent() {
           </button>
 
           {/* Dark/Light Mode Toggle */}
-          <button
-            onClick={toggleTheme}
-            className="text-gray-300 hover:text-white transition-colors text-xl p-2 hover:bg-gray-800 rounded-lg cursor-pointer"
-            title="Toggle Theme"
-          >
-            {theme === 'dark' ? <MdLightMode /> : <MdDarkMode />}
-          </button>
+
 
           {/* Logout Button */}
           <button
@@ -436,7 +433,308 @@ function HeaderContent() {
             <BiLogOut />
           </button>
         </div>
+
+        {/* Mobile - Hamburger Menu */}
+        <button
+          onClick={() => setShowMobileMenu(!showMobileMenu)}
+          className="flex md:hidden text-gray-300 hover:text-white transition-colors text-2xl p-2 hover:bg-gray-800 rounded-lg cursor-pointer"
+          title="Menu"
+        >
+          {showMobileMenu ? <AiOutlineClose /> : <GiHamburgerMenu />}
+        </button>
       </div>
+
+      {/* Mobile Navigation Menu */}
+      {showMobileMenu && (
+        <div className="md:hidden border-t border-gray-800 bg-gray-850">
+          <div className="px-6 py-4 space-y-3">
+            {/* Search Menu */}
+            <div className="space-y-2">
+              <button
+                onClick={() => setShowSearchMenu(!showSearchMenu)}
+                className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors cursor-pointer"
+              >
+                <IoSearch className="text-lg" />
+                <span>Search</span>
+              </button>
+              {showSearchMenu && (
+                <div className="ml-4 space-y-1 border-l border-gray-700 pl-4">
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('personal')) {
+                        handleNavigation('/search/personal');
+                        setShowMobileMenu(false);
+                        setShowSearchMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('personal')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('personal')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Personal
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('professional')) {
+                        handleNavigation('/search/professional');
+                        setShowMobileMenu(false);
+                        setShowSearchMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('professional')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('professional')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Professional
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('family')) {
+                        handleNavigation('/search/family');
+                        setShowMobileMenu(false);
+                        setShowSearchMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('family')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('family')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Family
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('online')) {
+                        handleNavigation('/search/online');
+                        setShowMobileMenu(false);
+                        setShowSearchMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('online')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('online')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Online
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Favorites Menu */}
+            <div className="space-y-2">
+              <button
+                onClick={() => setShowFavoritesMenu(!showFavoritesMenu)}
+                className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors cursor-pointer"
+              >
+                <AiOutlineHeart className="text-lg" />
+                <span>Favorites</span>
+              </button>
+              {showFavoritesMenu && (
+                <div className="ml-4 space-y-1 border-l border-gray-700 pl-4">
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('personal')) {
+                        handleNavigation('/favorites/personal');
+                        setShowMobileMenu(false);
+                        setShowFavoritesMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('personal')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('personal')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Personal
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('professional')) {
+                        handleNavigation('/favorites/professional');
+                        setShowMobileMenu(false);
+                        setShowFavoritesMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('professional')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('professional')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Professional
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('family')) {
+                        handleNavigation('/favorites/family');
+                        setShowMobileMenu(false);
+                        setShowFavoritesMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('family')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('family')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Family
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('online')) {
+                        handleNavigation('/favorites/online');
+                        setShowMobileMenu(false);
+                        setShowFavoritesMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('online')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('online')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Online
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Messages Menu */}
+            <div className="space-y-2">
+              <button
+                onClick={() => setShowMessagesMenu(!showMessagesMenu)}
+                className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors cursor-pointer"
+              >
+                <BiMessageDots className="text-lg" />
+                <span>Messages</span>
+              </button>
+              {showMessagesMenu && (
+                <div className="ml-4 space-y-1 border-l border-gray-700 pl-4">
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('personal')) {
+                        handleNavigation('/messages/personal');
+                        setShowMobileMenu(false);
+                        setShowMessagesMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('personal')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('personal')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Personal
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('professional')) {
+                        handleNavigation('/messages/professional');
+                        setShowMobileMenu(false);
+                        setShowMessagesMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('professional')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('professional')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Professional
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('family')) {
+                        handleNavigation('/messages/family');
+                        setShowMobileMenu(false);
+                        setShowMessagesMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('family')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('family')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Family
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (userIdentities.includes('online')) {
+                        handleNavigation('/messages/online');
+                        setShowMobileMenu(false);
+                        setShowMessagesMenu(false);
+                      }
+                    }}
+                    disabled={!userIdentities.includes('online')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      userIdentities.includes('online')
+                        ? 'text-gray-400 hover:text-white hover:bg-gray-700 cursor-pointer'
+                        : 'text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Online
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-gray-700 my-2"></div>
+
+            {/* Profile */}
+            <button
+              onClick={() => {
+                handleProfile();
+                setShowMobileMenu(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors cursor-pointer"
+            >
+              <CgProfile className="text-lg" />
+              <span>Profile</span>
+            </button>
+
+            {/* Theme Toggle */}
+            <button
+              onClick={() => toggleTheme()}
+              className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors cursor-pointer"
+            >
+              {theme === 'dark' ? <MdLightMode className="text-lg" /> : <MdDarkMode className="text-lg" />}
+              <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+            </button>
+
+            {/* Logout */}
+            <button
+              onClick={() => {
+                handleLogout();
+                setShowMobileMenu(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-red-400 hover:bg-gray-800 rounded-lg transition-colors cursor-pointer"
+            >
+              <BiLogOut className="text-lg" />
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
